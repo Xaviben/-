@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>值日生轮值表</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 FontAwesome 图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入 Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+        }
+        @media (prefers-color-scheme: dark) {
+            .glass-card {
+                background: rgba(15, 23, 42, 0.85);
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+
+    <!-- 顶栏导航 -->
+    <header class="w-full border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-calendar-days text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight">值日生轮值表</h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">自动排班与实时轮换系统</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="openShareModal()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-violet-50 dark:bg-violet-950 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-900 transition-all flex items-center space-x-1.5">
+                    <i class="fa-solid fa-share-nodes"></i>
+                    <span>分享给他人</span>
+                </button>
+                <button onclick="setToday()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-all">
+                    回到今天
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主体内容区域 -->
+    <main class="max-w-5xl mx-auto px-4 py-8 w-full flex-grow space-y-8">
+
+        <!-- 日期选择与今日状态卡片 -->
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- 日期控制卡片 -->
+            <div class="glass-card rounded-2xl p-6 shadow-sm border border-slate-200/60 dark:border-slate-800 flex flex-col justify-between">
+                <div>
+                    <span class="text-xs font-semibold tracking-wider text-indigo-600 dark:text-indigo-400 uppercase">当前查看日期</span>
+                    <div class="mt-2 flex items-baseline space-x-2">
+                        <input type="date" id="datePicker" onchange="onDateChange()" class="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full">
+                    </div>
+                </div>
+                <div class="mt-6 flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <button onclick="changeDay(-1)" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                        <i class="fa-solid fa-chevron-left mr-1"></i> 前一天
+                    </button>
+                    <button onclick="changeDay(1)" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                        后一天 <i class="fa-solid fa-chevron-right ml-1"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 今日值日看板 (跨2列) -->
+            <div id="todayCard" class="md:col-span-2 rounded-2xl p-6 bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-xl shadow-indigo-500/10 flex flex-col justify-between relative overflow-hidden">
+                <div class="absolute -right-10 -bottom-10 opacity-10 text-9xl">
+                    <i class="fa-solid fa-clipboard-user"></i>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <span id="badgeDay" class="px-2.5 py-1 rounded-full text-xs font-bold bg-white/20 backdrop-blur-md">加载中...</span>
+                            <span id="badgeGroup" class="px-2.5 py-1 rounded-full text-xs font-medium bg-white/10 backdrop-blur-md">---</span>
+                        </div>
+                        <span id="displayDate" class="text-xs font-medium opacity-80">---</span>
+                    </div>
+                    <h2 id="cardTitle" class="text-2xl font-bold mt-3">今日值日安排</h2>
+                </div>
+
+                <!-- 安排详情网格 -->
+                <div id="assignmentGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+                    <!-- 动态渲染任务 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 中部：分组说明与规则 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 组1 说明 -->
+            <div class="glass-card rounded-2xl p-6 shadow-sm border border-slate-200/60 dark:border-slate-800">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-9 h-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 dark:text-white">第一组（周一、周三、周五）</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">成员：张天旭、王炜烨、贾博文</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <span class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 text-xs font-medium border border-blue-200/50 dark:border-blue-800/50"><i class="fa-solid fa-user mr-1"></i>张天旭</span>
+                    <span class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 text-xs font-medium border border-blue-200/50 dark:border-blue-800/50"><i class="fa-solid fa-user mr-1"></i>王炜烨</span>
+                    <span class="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 text-xs font-medium border border-blue-200/50 dark:border-blue-800/50"><i class="fa-solid fa-user mr-1"></i>贾博文</span>
+                </div>
+            </div>
+
+            <!-- 组2 说明 -->
+            <div class="glass-card rounded-2xl p-6 shadow-sm border border-slate-200/60 dark:border-slate-800">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-9 h-9 rounded-xl bg-violet-500/10 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400 flex items-center justify-center font-bold">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 dark:text-white">第二组（周二、周四、周六）</h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">成员：李学彬、张召玉、于明辉</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <span class="px-2.5 py-1 rounded-lg bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 text-xs font-medium border border-violet-200/50 dark:border-violet-800/50"><i class="fa-solid fa-user mr-1"></i>李学彬</span>
+                    <span class="px-2.5 py-1 rounded-lg bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 text-xs font-medium border border-violet-200/50 dark:border-violet-800/50"><i class="fa-solid fa-user mr-1"></i>张召玉</span>
+                    <span class="px-2.5 py-1 rounded-lg bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 text-xs font-medium border border-violet-200/50 dark:border-violet-800/50"><i class="fa-solid fa-user mr-1"></i>于明辉</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 下部：全周总览表 -->
+        <section class="glass-card rounded-2xl p-6 shadow-sm border border-slate-200/60 dark:border-slate-800">
+            <h3 class="font-bold text-slate-900 dark:text-white mb-4 flex items-center space-x-2">
+                <i class="fa-solid fa-table-list text-indigo-500"></i>
+                <span>本周值日总览</span>
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3" id="weeklyOverviewGrid">
+                <!-- 动态注入周一至周六卡片 -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="w-full border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+        <p>值日生轮值管理系统 &bull; 维护良好环境，从你我做起</p>
+    </footer>
+
+    <!-- 分享说明弹窗 -->
+    <div id="shareModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden">
+        <div class="glass-card bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl border border-slate-200 dark:border-slate-800 relative animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-bold text-lg flex items-center space-x-2">
+                    <i class="fa-solid fa-mobile-screen-button text-indigo-500"></i>
+                    <span>如何让手机点开/分享给别人？</span>
+                </h3>
+                <button onclick="closeShareModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4 text-xs text-slate-600 dark:text-slate-300">
+                <!-- 方法一 -->
+                <div class="p-3.5 bg-indigo-50 dark:bg-indigo-950/50 rounded-xl border border-indigo-100 dark:border-indigo-900 text-indigo-900 dark:text-indigo-200">
+                    <p class="font-bold text-sm mb-1"><i class="fa-solid fa-cloud-arrow-up mr-1.5 text-indigo-500"></i>方法一：生成永久在线链接（推荐，随时随地可用）</p>
+                    <p class="leading-relaxed mt-1">您可以将代码免费托管到以下平台，生成一个网页链接，发到微信群，手机点击即可直接查看：</p>
+                    <ul class="list-disc pl-4 mt-2 space-y-1 font-medium">
+                        <li><strong>GitHub Pages / Vercel / Netlify：</strong>新建一个仓库上传本代码，几秒钟即可获取专属链接。</li>
+                        <li><strong>静态托管小工具：</strong>如 <em>静态网页托管</em> 或其他云服务平台，拖入 <code class="bg-indigo-100 dark:bg-indigo-900 px-1 py-0.5 rounded">index.html</code> 即可。</li>
+                    </ul>
+                </div>
+
+                <!-- 方法二 -->
+                <div class="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <p class="font-bold text-sm mb-1 text-slate-800 dark:text-white"><i class="fa-solid fa-house-laptop mr-1.5 text-emerald-500"></i>方法二：局域网直接在手机上打开</p>
+                    <p class="leading-relaxed mt-1">如果电脑和手机连了<strong>同一个Wi-Fi</strong>：</p>
+                    <ol class="list-decimal pl-4 mt-1.5 space-y-1">
+                        <li>将本代码保存为电脑桌面上的 <code class="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded">index.html</code> 文件。</li>
+                        <li>在电脑上用命令行（如终端/CMD）运行一个简易服务器（例如在文件目录下运行 <code class="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded">python -m http.server 8000</code>）。</li>
+                        <li>在手机浏览器输入电脑的局域网IP地址（如 <code class="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded">http://192.168.x.x:8000</code>）即可点开！</li>
+                    </ol>
+                </div>
+
+                <!-- 方法三 -->
+                <div class="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <p class="font-bold text-sm mb-1 text-slate-800 dark:text-white"><i class="fa-solid fa-file-arrow-down mr-1.5 text-amber-500"></i>方法三：文件传输至手机打开</p>
+                    <p class="leading-relaxed mt-1">点击下方按钮复制本页面的全部完整代码，在手机上新建一个文本文档，把后缀名改为 <code class="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded">index.html</code>，然后用手机自带浏览器打开即可完美运行！</p>
+                </div>
+            </div>
+
+            <div class="mt-6 flex space-x-3">
+                <button onclick="copyPageCode()" class="flex-1 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-xs transition shadow-lg shadow-indigo-500/20 flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-code"></i>
+                    <span>复制网页完整源码</span>
+                </button>
+                <button onclick="closeShareModal()" class="py-2.5 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-semibold rounded-xl text-xs transition">
+                    关闭
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提示消息框 -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2.5 rounded-xl text-xs font-medium shadow-xl opacity-0 pointer-events-none transition-all duration-300 z-50">
+        源码已复制成功！
+    </div>
+
+    <!-- 逻辑脚本 -->
+    <script>
+        // 定义两组人员
+        const group1 = ["张天旭", "王炜烨", "贾博文"]; // 周一、周三、周五
+        const group2 = ["李学彬", "张召玉", "于明辉"]; // 周二、周四、周六
+
+        // 工作内容固定三人轮换
+        const tasks = ["拖地", "擦镜子", "丢垃圾"];
+
+        /**
+         * 计算指定日期对应的任务安排
+         */
+        function getAssignmentsForDate(dateObj) {
+            const dayOfWeek = dateObj.getDay(); // 0是周日, 1-6是周一到周六
+            
+            if (dayOfWeek === 0) {
+                return { isRest: true, dayName: "周日", groupName: "休息", membersTask: {} };
+            }
+
+            let groupMembers = [];
+            let dayName = "";
+
+            if (dayOfWeek === 1 || dayOfWeek === 3 || dayOfWeek === 5) {
+                groupMembers = [...group1];
+                dayName = dayOfWeek === 1 ? "周一" : (dayOfWeek === 3 ? "周三" : "周五");
+            } else {
+                groupMembers = [...group2];
+                dayName = dayOfWeek === 2 ? "周二" : (dayOfWeek === 4 ? "周四" : "周六");
+            }
+
+            const baseDate = new Date(2026, 0, 5); // 2026年1月5日（周一）作为基准
+            const diffTime = dateObj.getTime() - baseDate.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            
+            let attendanceIndex = 0;
+            if (dayOfWeek === 1 || dayOfWeek === 3 || dayOfWeek === 5) {
+                const weekOffset = Math.floor(diffDays / 7);
+                const dayMap = { 1: 0, 3: 1, 5: 2 };
+                attendanceIndex = weekOffset * 3 + dayMap[dayOfWeek];
+            } else {
+                const weekOffset = Math.floor((diffDays - 1) / 7);
+                const dayMap = { 2: 0, 4: 1, 6: 2 };
+                attendanceIndex = weekOffset * 3 + dayMap[dayOfWeek];
+            }
+
+            const offset = attendanceIndex % groupMembers.length;
+            let rotatedMembers = [
+                groupMembers[(0 + offset) % 3],
+                groupMembers[(1 + offset) % 3],
+                groupMembers[(2 + offset) % 3]
+            ];
+
+            // 特殊对齐规则：对于组1（周一、周三、周五），当今天是周三时，要求张天旭做“丢垃圾” (tasks[2])
+            if (dayOfWeek === 3) {
+                const tIndex = rotatedMembers.indexOf("张天旭");
+                if (tIndex !== -1 && tIndex !== 2) {
+                    const shift = (2 - tIndex + 3) % 3;
+                    if (shift === 1) {
+                        rotatedMembers = [rotatedMembers[2], rotatedMembers[0], rotatedMembers[1]];
+                    } else if (shift === 2) {
+                        rotatedMembers = [rotatedMembers[1], rotatedMembers[2], rotatedMembers[0]];
+                    }
+                }
+            }
+
+            return {
+                isRest: false,
+                dayName: dayName,
+                groupName: (dayOfWeek === 1 || dayOfWeek === 3 || dayOfWeek === 5) ? "第一组" : "第二组",
+                membersTask: {
+                    [tasks[0]]: rotatedMembers[0],
+                    [tasks[1]]: rotatedMembers[1],
+                    [tasks[2]]: rotatedMembers[2]
+                }
+            };
+        }
+
+        // 初始化日期选择器为今天
+        let currentDate = new Date();
+
+        function formatDateString(d) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function initApp() {
+            document.getElementById('datePicker').value = formatDateString(currentDate);
+            updateView();
+            renderWeeklyOverview();
+        }
+
+        function setToday() {
+            currentDate = new Date();
+            document.getElementById('datePicker').value = formatDateString(currentDate);
+            updateView();
+        }
+
+        function changeDay(offset) {
+            currentDate.setDate(currentDate.getDate() + offset);
+            document.getElementById('datePicker').value = formatDateString(currentDate);
+            updateView();
+        }
+
+        function onDateChange() {
+            const val = document.getElementById('datePicker').value;
+            if (val) {
+                const parts = val.split('-');
+                currentDate = new Date(parts[0], parts[1] - 1, parts[2]);
+                updateView();
+            }
+        }
+
+        function updateView() {
+            const result = getAssignmentsForDate(currentDate);
+            
+            document.getElementById('badgeDay').innerText = result.dayName;
+            document.getElementById('badgeGroup').innerText = result.groupName;
+            
+            const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+            document.getElementById('displayDate').innerText = currentDate.toLocaleDateString('zh-CN', options);
+
+            const grid = document.getElementById('assignmentGrid');
+            grid.innerHTML = '';
+
+            if (result.isRest) {
+                document.getElementById('cardTitle').innerText = "今天周末，好好休息！";
+                grid.innerHTML = `
+                    <div class="col-span-3 py-6 text-center text-white/90 bg-white/10 backdrop-blur-md rounded-xl font-medium">
+                        <i class="fa-solid fa-mug-hot text-3xl mb-2"></i>
+                        <p>周日无需值日，放松一下吧~</p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('cardTitle').innerText = "今日值日安排";
+
+            const taskIcons = {
+                "拖地": "fa-broom",
+                "擦镜子": "fa-spray-can-sparkles",
+                "丢垃圾": "fa-trash-can"
+            };
+
+            tasks.forEach(task => {
+                const person = result.membersTask[task];
+                const icon = taskIcons[task] || "fa-circle-check";
+                const itemEl = document.createElement('div');
+                itemEl.className = "bg-white/15 backdrop-blur-md rounded-xl p-4 border border-white/20 flex flex-col justify-between";
+                itemEl.innerHTML = `
+                    <div class="flex items-center space-x-2 text-white/80 text-xs font-medium">
+                        <i class="fa-solid ${icon}"></i>
+                        <span>${task}</span>
+                    </div>
+                    <div class="mt-3 text-lg font-bold text-white tracking-wide">
+                        ${person}
+                    </div>
+                `;
+                grid.appendChild(itemEl);
+            });
+        }
+
+        function renderWeeklyOverview() {
+            const overviewGrid = document.getElementById('weeklyOverviewGrid');
+            overviewGrid.innerHTML = '';
+
+            // 获取当前日期所在周的周一
+            const tempDate = new Date(currentDate);
+            const day = tempDate.getDay();
+            const diffToMonday = tempDate.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(tempDate.setDate(diffToMonday));
+
+            for (let i = 0; i < 6; i++) {
+                const dayObj = new Date(monday);
+                dayObj.setDate(monday.getDate() + i);
+                const res = getAssignmentsForDate(dayObj);
+
+                const isToday = formatDateString(dayObj) === formatDateString(new Date());
+
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-xl border transition-all ${
+                    isToday 
+                        ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30 shadow-md shadow-indigo-500/5' 
+                        : 'border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900'
+                }`;
+
+                let contentHtml = '';
+                if (res.isRest) {
+                    contentHtml = `<p class="text-xs text-slate-400 italic mt-2">休息日</p>`;
+                } else {
+                    contentHtml = `<div class="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">`;
+                    tasks.forEach(t => {
+                        contentHtml += `<div><span class="text-slate-400 font-light">${t}:</span> <span class="font-medium text-slate-800 dark:text-slate-200">${res.membersTask[t]}</span></div>`;
+                    });
+                    contentHtml += `</div>`;
+                }
+
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-sm ${isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-100'}">${res.dayName}</span>
+                        <span class="text-[10px] text-slate-400">${formatDateString(dayObj).slice(5)}</span>
+                    </div>
+                    ${contentHtml}
+                `;
+                overviewGrid.appendChild(card);
+            }
+        }
+
+        // 分享弹窗控制函数
+        function openShareModal() {
+            document.getElementById('shareModal').classList.remove('hidden');
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').classList.add('hidden');
+        }
+
+        function copyPageCode() {
+            const fullHtml = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+            const textarea = document.createElement('textarea');
+            textarea.value = fullHtml;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast("完整网页源码已复制，可粘贴保存为 index.html 在手机打开！");
+            } catch (err) {
+                showToast("复制失败，请手动选择复制");
+            }
+            document.body.removeChild(textarea);
+            closeShareModal();
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            toast.classList.add('opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
+
+        // 页面加载完成后初始化
+        window.onload = initApp;
+    </script>
+</body>
+</html>
